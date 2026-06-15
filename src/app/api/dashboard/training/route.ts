@@ -1,41 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase'
 
 export async function GET(req: NextRequest) {
   const userId = 'odinn'
   
-  const sessions = await prisma.trainingSession.findMany({
-    where: { userId },
-    orderBy: { date: 'desc' },
-    take: 5,
-  })
+  const { data: sessions } = await supabase
+    .from('training_sessions')
+    .select('*')
+    .eq('userId', userId)
+    .order('date', { ascending: false })
+    .limit(5)
 
-  return NextResponse.json(sessions)
+  return NextResponse.json(sessions || [])
 }
 
 export async function POST(req: NextRequest) {
   const userId = 'odinn'
 
-  // Ensure profile exists
-  await prisma.profile.upsert({
-    where: { userId },
-    update: {},
-    create: { userId, name: 'Odinn' },
-  })
+  await supabase
+    .from('profiles')
+    .upsert({ userId, name: 'Odinn' }, { onConflict: 'userId' })
 
   const data = await req.json()
-  
-  // Calculate training load
   const trainingLoad = data.durationMinutes * data.intensity
 
-  const session = await prisma.trainingSession.create({
-    data: {
+  const { data: session, error } = await supabase
+    .from('training_sessions')
+    .insert({
       userId,
       ...data,
       trainingLoad,
-      date: new Date(data.date),
-    },
-  })
+      date: new Date(data.date).toISOString(),
+    })
+    .select()
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json(session)
 }

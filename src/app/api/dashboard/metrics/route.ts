@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { supabase } from '@/lib/supabase'
 import { calculateRecoveryScore, calculateReadinessScore } from '@/lib/recovery-engine'
 
 export async function GET(req: NextRequest) {
@@ -7,30 +7,24 @@ export async function GET(req: NextRequest) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  const metrics = await prisma.dailyMetrics.findUnique({
-    where: {
-      userId_date: {
-        userId,
-        date: today,
-      },
-    },
-  })
+  const { data: metrics } = await supabase
+    .from('daily_metrics')
+    .select('*')
+    .eq('userId', userId)
+    .eq('date', today.toISOString())
+    .single()
 
-  // Get yesterday's load for recovery calculation if not already present
   const yesterday = new Date(today)
   yesterday.setDate(yesterday.getDate() - 1)
   
-  const trainingSessions = await prisma.trainingSession.findMany({
-    where: {
-      userId,
-      date: {
-        gte: yesterday,
-        lt: today,
-      },
-    },
-  })
+  const { data: sessions } = await supabase
+    .from('training_sessions')
+    .select('trainingLoad')
+    .eq('userId', userId)
+    .gte('date', yesterday.toISOString())
+    .lt('date', today.toISOString())
   
-  const trainingLoadYesterday = trainingSessions.reduce((acc, s) => acc + s.trainingLoad, 0)
+  const trainingLoadYesterday = sessions?.reduce((acc, s) => acc + s.trainingLoad, 0) || 0
 
   return NextResponse.json({
     metrics: metrics || null,
@@ -41,33 +35,27 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const userId = 'odinn'
   
-  // Ensure profile exists
-  await prisma.profile.upsert({
-    where: { userId },
-    update: {},
-    create: { userId, name: 'Odinn' },
-  })
+  await supabase
+    .from('profiles')
+    .upsert({ userId, name: 'Odinn' }, { onConflict: 'userId' })
 
   const data = await req.json()
   const today = new Date()
   today.setHours(0, 0, 0, 0)
+  const dateStr = today.toISOString()
 
-  // Fetch data for score calculations
   const yesterday = new Date(today)
   yesterday.setDate(yesterday.getDate() - 1)
   
-  const yesterdaySessions = await prisma.trainingSession.findMany({
-    where: {
-      userId,
-      date: {
-        gte: yesterday,
-        lt: today,
-      },
-    },
-  })
-  const trainingLoadYesterday = yesterdaySessions.reduce((acc, s) => acc + s.trainingLoad, 0)
+  const { data: yesterdaySessions } = await supabase
+    .from('training_sessions')
+    .select('trainingLoad')
+    .eq('userId', userId)
+    .gte('date', yesterday.toISOString())
+    .lt('date', today.toISOString())
 
-  // Mock values for readiness calculation
+  const trainingLoadYesterday = yesterdaySessions?.reduce((acc, s) => acc + s.trainingLoad, 0) || 0
+
   const sevenDayAvgLoad = 500
   const thirtyDayAvgLoad = 450
   const sleepConsistency = 85
@@ -96,28 +84,20 @@ export async function POST(req: NextRequest) {
   if (recoveryScore < 50) status = 'RED'
   else if (recoveryScore < 75) status = 'YELLOW'
 
-  const metrics = await prisma.dailyMetrics.upsert({
-    where: {
-      userId_date: {
-        userId,
-        date: today,
-      },
-    },
-    update: {
-      ...data,
-      recoveryScore,
-      readinessScore,
-      status,
-    },
-    create: {
+  const { data: metrics, error } = await supabase
+    .from('daily_metrics')
+    .upsert({
       userId,
-      date: today,
+      date: dateStr,
       ...data,
       recoveryScore,
       readinessScore,
       status,
-    },
-  })
+    }, { onConflict: 'userId,date' })
+    .select()
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json(metrics)
 }
