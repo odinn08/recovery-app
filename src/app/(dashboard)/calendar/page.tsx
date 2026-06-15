@@ -12,7 +12,7 @@ export default function CalendarPage() {
   // Mock data for recovery status
   const greenDays = [new Date(2026, 5, 1), new Date(2026, 5, 2), new Date(2026, 5, 5), new Date(2026, 5, 6), new Date(2026, 5, 7), new Date(2026, 5, 8), new Date(2026, 5, 11), new Date(2026, 5, 12), new Date(2026, 5, 14)]
   const yellowDays = [new Date(2026, 5, 3), new Date(2026, 5, 4), new Date(2026, 5, 9), new Date(2026, 5, 10), new Date(2026, 5, 13)]
-  const redDays = [] // None in this mock
+  const redDays: Date[] = []  // None in this mock
 
   const modifiers = {
     green: greenDays,
