@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Zap, TrendingUp, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { Zap, TrendingUp, AlertCircle, CheckCircle2, Sparkles } from 'lucide-react'
 
 export default function AICoachPage() {
   const weeklyWins = [
