@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Profile {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  name       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  dailyMetrics     DailyMetrics[]
+  trainingSessions TrainingSession[]
+
+  @@map("profiles")
+}
+
+model DailyMetrics {
+  id                String   @id @default(uuid())
+  userId            String
+  date              DateTime @default(now())
+
+  // Sleep
+  sleepHours        Float?
+  deepSleepMinutes  Int?
+  remSleepMinutes   Int?
+
+  // Vitals
+  hrv               Float?
+  restingHr         Int?
+  weight            Float?
+
+  // Subjective
+  energyScore       Int?     // 1-10
+  sorenessScore     Int?     // 1-10
+
+  // Calculated Scores
+  recoveryScore     Int?     // 0-100
+  readinessScore    Int?     // 0-100
+  status            String?  // green, yellow, red
+
+  profile           Profile  @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("daily_metrics")
+}
+
+model TrainingSession {
+  id               String   @id @default(uuid())
+  userId           String
+  date             DateTime @default(now())
+  sport            String
+  durationMinutes  Int
+  intensity        Int      // 1-10
+  trainingLoad     Int      // duration * intensity
+  notes            String?
+
+  profile          Profile  @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@map("training_sessions")
+}
